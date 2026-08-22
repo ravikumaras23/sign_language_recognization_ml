@@ -1,0 +1,25 @@
+# Python virtual environment
+env/
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime/generated files
+detected_text.txt
+sign_language_detections.txt
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
