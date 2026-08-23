@@ -2,10 +2,7 @@ import { detectionBaseUrl } from "../Config/config";
 
 const API_BASE_URL = detectionBaseUrl;
 
-async function apiRequest(
-  endpoint,
-  options = {}
-) {
+async function apiRequest(endpoint, options = {}) {
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
     {
@@ -37,43 +34,26 @@ async function apiRequest(
   return data;
 }
 
-export async function startDetection(
-  language = "ISL"
-) {
-  return apiRequest(
-    "/start_detection",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        language,
-      }),
-    }
-  );
+export async function startDetection(language = "ISL") {
+  return apiRequest("/start_detection", {
+    method: "POST",
+    body: JSON.stringify({ language }),
+  });
 }
 
 export async function stopDetection() {
-  return apiRequest(
-    "/stop_detection",
-    {
-      method: "POST",
-    }
-  );
+  return apiRequest("/stop_detection", {
+    method: "POST",
+  });
 }
 
 export async function getHealth() {
   return apiRequest("/health");
 }
 
-export async function processLandmarks(
-  landmarks
-) {
-  return apiRequest(
-    "/process_frame",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        landmarks,
-      }),
-    }
-  );
+export async function processLandmarks(landmarks) {
+  return apiRequest("/process_frame", {
+    method: "POST",
+    body: JSON.stringify({ landmarks }),
+  });
 }
