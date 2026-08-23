@@ -13,4 +13,4 @@ export const baseURL =
 
 export const detectionBaseUrl =
   process.env.REACT_APP_DETECTION_API_URL ||
-  "http://127.0.0.1:8000";
+  "https://sign-language-recognization-ml.onrender.com";
