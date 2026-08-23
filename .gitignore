@@ -134,3 +134,15 @@ config.local.*
 
 
 test_env/
+
+# Project deployment ignores
+test_env/
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+frontend/build/
+.env
+frontend/.env
+backend/.env
+detected_text.txt
+sign_language_detections.txt
