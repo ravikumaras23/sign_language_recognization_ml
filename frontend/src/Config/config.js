@@ -1,6 +1,6 @@
 const defaultApiBaseUrl =
   process.env.REACT_APP_API_BASE_URL ||
-  "http://localhost:5000";
+  "https://sign-language-recognization-backend.onrender.com";
 
 export const apiBaseUrl =
   defaultApiBaseUrl.replace(/\/+$/, "");
