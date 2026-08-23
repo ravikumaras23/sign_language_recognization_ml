@@ -132,3 +132,5 @@ pnpm-debug.log*
 *.local
 config.local.*
 
+
+test_env/
