@@ -1,6 +1,3 @@
-
-
-
 const express = require("express");
 const cors = require("cors");
 
@@ -22,10 +19,14 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// ============================================================
+// BASIC ROUTES
+// ============================================================
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    service: "SingLang Backend API",
+    service: "SingLangBackend API",
   });
 });
 
@@ -36,15 +37,31 @@ app.get("/health", (req, res) => {
   });
 });
 
+// ============================================================
+// API ROUTES
+// ============================================================
+
 app.use("/user", userRoutes);
 app.use("/sign-kit/videos", videoRoutes);
 
-const startServer = async () => {
-  await connectDB();
+// ============================================================
+// START SERVER
+// ============================================================
 
+const startServer = async () => {
+  // Start Express immediately so Render can detect the service.
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Backend running on port ${PORT}`);
   });
+
+  // Connect to MongoDB after the HTTP server is available.
+  const connected = await connectDB();
+
+  if (!connected) {
+    console.error(
+      "WARNING: Backend is running, but MongoDB is not connected."
+    );
+  }
 };
 
 startServer();
