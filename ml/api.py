@@ -1291,7 +1291,22 @@ async def statistics():
                 "5.0.0",
         }
     }
+# ============================================================
+# HEALTH
+# ============================================================
 
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+        "service": "SingLang ML API",
+        "version": "5.0.0",
+        "ml": True,
+        "supported_languages": SUPPORTED_LANGUAGES,
+    }
+
+
+    
 
 # ============================================================
 # ROOT
@@ -1344,6 +1359,13 @@ async def root():
                 "DELETE /clear_session",
         }
     }
+
+
+
+
+
+
+
 
 
 # ============================================================

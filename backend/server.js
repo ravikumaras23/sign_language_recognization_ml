@@ -1,28 +1,50 @@
+
+
+
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
+
 const userRoutes = require("./routes/UserRoutes");
+const videoRoutes = require("./routes/VideoRoutes");
 const connectDB = require("./config/db");
 
-
-connectDB()
 const app = express();
-const PORT = 5000;
 
-// Middleware
-app.use(cors()); // Enable CORS for all routes
-app.use(bodyParser.json()); // Parse JSON request bodies
-app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded request bodies
+const PORT = process.env.PORT || 10000;
+
+app.use(
+  cors({
+    origin: true,
+    credentials: false,
+  })
+);
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    service: "SingLang Backend API",
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    status: "healthy",
+  });
+});
 
 app.use("/user", userRoutes);
+app.use("/sign-kit/videos", videoRoutes);
 
-// Example POST route
-app.post("/api/data", (req, res) => {
-  console.log("Received data:", req.body);
-  res.json({ message: "Data received", data: req.body });
-});
+const startServer = async () => {
+  await connectDB();
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Backend running on port ${PORT}`);
+  });
+};
+
+startServer();

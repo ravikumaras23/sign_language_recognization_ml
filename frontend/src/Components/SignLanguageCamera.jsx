@@ -15,7 +15,7 @@ import {
 // CONFIGURATION
 // ============================================================
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+//const API_BASE_URL = "http://127.0.0.1:8000";
 
 const MEDIAPIPE_WASM_URL =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm";
