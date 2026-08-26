@@ -20,6 +20,7 @@ const LoginPage = () => {
       const response = await axios.post(`${authBaseUrl}/login`, {
         email,
         password,
+
       });
 
       const { token, user } = response.data;

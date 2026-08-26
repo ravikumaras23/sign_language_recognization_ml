@@ -100,7 +100,7 @@ function Video() {
     if(ref.animations[0].length){
         if(!ref.flag) {
           if(ref.animations[0][0]==='add-text'){
-            setText(text + ref.animations[0][1]);
+            setText((prevText) => prevText + ref.animations[0][1]);
             ref.animations.shift();
           }
           else{
@@ -157,18 +157,41 @@ function Video() {
     }
   }
 
-  const animateFromID = () => {
-      const videoID = id.current.value;
-      axios.get(`${baseURL}/videos/${videoID}`).then((res) => {
-        console.log(res.data)
-        setTitle(res.data.title)
-        setDesc(res.data.desc)
-        sign(res.data.content);
-      }).catch(err => {
-        console.log(err)
-        setInvalidId(true)
-      });
-  }
+  const animateFromID = async () => {
+    const videoID = id.current?.value?.trim();
+
+    if (!videoID) {
+      setInvalidId(true);
+      return;
+    }
+
+    try {
+      setInvalidId(false);
+
+      const response = await axios.get(
+        `${baseURL}/videos/${encodeURIComponent(videoID)}`
+      );
+
+      console.log("Video API response:", response.data);
+
+      if (!response.data || !response.data.content) {
+        throw new Error("Video content was not returned by the server.");
+      }
+
+      setTitle(response.data.title || "");
+      setDesc(response.data.desc || "");
+
+      sign(response.data.content);
+    } catch (error) {
+      console.error("Video API error:", error);
+
+      setTitle("");
+      setDesc("");
+      setText("");
+
+      setInvalidId(true);
+    }
+  };
 
   return (
     <div className='container-fluid'>
@@ -177,7 +200,11 @@ function Video() {
           <label className='label-style'>
               Video ID
           </label>
-          <input ref={id} splaceholder='Video ID' className='w-100 input-style' />
+          <input
+              ref={id}
+              placeholder="Video ID"
+              className="w-100 input-style"
+            />
           <button onClick={animateFromID} className='btn btn-primary w-100 btn-style btn-start mb-3'>
               Start Video
           </button>

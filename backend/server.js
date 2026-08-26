@@ -49,6 +49,8 @@ app.use("/sign-kit/videos", videoRoutes);
 // ============================================================
 
 const startServer = async () => {
+    await connectDB();
+
   // Start Express immediately so Render can detect the service.
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Backend running on port ${PORT}`);
