@@ -72,7 +72,7 @@ class ASLDetector:
 
         self.model_path = os.path.join(
             base_dir,
-            "random_forest_asl_model.pkl",
+            "random_forest_isl_model.pkl",
         )
 
         # ----------------------------------------------------
@@ -1418,7 +1418,6 @@ class UnifiedSignLanguageDetector:
 
                 "input_shape":
                     "(1, 1, 84)",
-
                 "auto_detection":
                     True,
 
