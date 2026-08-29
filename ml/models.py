@@ -1,5 +1,6 @@
 import os
 import pickle
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -23,46 +24,63 @@ class ASLDetector:
         self.hands = None
 
         # ----------------------------------------------------
-        # ASL LABELS
+        # IMPORTANT
+        #
+        # Your trained Random Forest has:
+        #
+        # classes = 0 ... 34
+        # features = 84
+        #
+        # Therefore the feature format MUST remain 84.
         # ----------------------------------------------------
 
         self.asl_labels_dict = {
-            0: "A",
-            1: "B",
-            2: "C",
-            3: "D",
-            4: "E",
-            5: "F",
-            6: "G",
-            7: "H",
-            8: "I",
-            9: "J",
-            10: "K",
-            11: "L",
-            12: "M",
-            13: "N",
-            14: "O",
-            15: "P",
-            16: "Q",
-            17: "R",
-            18: "S",
-            19: "T",
-            20: "U",
-            21: "V",
-            22: "W",
-            23: "X",
-            24: "Y",
-            25: "Z",
+            0: "1",
+            1: "2",
+            2: "3",
+            3: "4",
+            4: "5",
+            5: "6",
+            6: "7",
+            7: "8",
+            8: "9",
+
+            9: "A",
+            10: "B",
+            11: "C",
+            12: "D",
+            13: "E",
+            14: "F",
+            15: "G",
+            16: "H",
+            17: "I",
+            18: "J",
+            19: "K",
+            20: "L",
+            21: "M",
+            22: "N",
+            23: "O",
+            24: "P",
+            25: "Q",
+            26: "R",
+            27: "S",
+            28: "T",
+            29: "U",
+            30: "V",
+            31: "W",
+            32: "X",
+            33: "Y",
+            34: "Z",
         }
 
         # ----------------------------------------------------
         # MODEL PATH
         #
-        # models.py is inside:
+        # Actual trained model:
         #
         # ml/
         #   models.py
-        #   random_forest_asl_model.pkl
+        #   random_forest_isl_model.pkl
         #
         # ----------------------------------------------------
 
@@ -83,14 +101,14 @@ class ASLDetector:
 
         self.prediction_counter = 0
 
-        # Around 1.5-2 seconds depending on FPS
+        # Hold sign for approximately 1.5-2 seconds
         self.required_consistent_frames = 25
 
         self.last_added_char = None
 
         self.cooldown_counter = 0
 
-        # Around 1 second at ~15 FPS
+        # Approximately 1 second at 15 FPS
         self.cooldown_frames = 15
 
         # Minimum confidence
@@ -99,42 +117,44 @@ class ASLDetector:
         self.last_results = None
 
     # ========================================================
-    # LOAD ASL MODEL
+    # LOAD MODEL
     # ========================================================
 
     def load_model(self):
 
         try:
 
-            # ------------------------------------------------
-            # Check model file
-            # ------------------------------------------------
-
-            if not os.path.exists(
-                self.model_path
-            ):
-
-                print(
-                    "ASL model file not found:"
-                )
-
-                print(
-                    self.model_path
-                )
-
-                return False
-
             print(
                 "=========================================="
             )
 
             print(
-                "Loading ASL Random Forest model:"
+                "Loading ASL Random Forest model"
             )
 
             print(
+                "Model path:",
                 self.model_path
             )
+
+            # ------------------------------------------------
+            # Check model
+            # ------------------------------------------------
+
+            if not os.path.isfile(
+                self.model_path
+            ):
+
+                print(
+                    "ERROR: ASL model file not found"
+                )
+
+                print(
+                    "Expected:",
+                    self.model_path
+                )
+
+                return False
 
             # ------------------------------------------------
             # Load pickle
@@ -142,18 +162,17 @@ class ASLDetector:
 
             with open(
                 self.model_path,
-                "rb",
-            ) as f:
+                "rb"
+            ) as file:
 
-                loaded_model = pickle.load(f)
+                loaded_model = pickle.load(file)
 
             # ------------------------------------------------
-            # Support both:
+            # Support:
             #
-            # Direct model:
-            # RandomForestClassifier(...)
+            # RandomForestClassifier
             #
-            # OR:
+            # OR
             #
             # {
             #     "model": RandomForestClassifier(...)
@@ -163,67 +182,103 @@ class ASLDetector:
             if (
                 isinstance(
                     loaded_model,
-                    dict,
+                    dict
                 )
                 and "model" in loaded_model
             ):
 
-                self.model = (
-                    loaded_model["model"]
-                )
+                self.model = loaded_model["model"]
 
             else:
 
                 self.model = loaded_model
 
             # ------------------------------------------------
-            # Verify model
+            # Validate model
             # ------------------------------------------------
 
             if self.model is None:
 
                 print(
-                    "ASL model loaded as None."
+                    "ERROR: Loaded ASL model is None"
                 )
 
                 return False
+
+            # ------------------------------------------------
+            # Print model information
+            # ------------------------------------------------
 
             print(
                 "ASL model loaded successfully."
             )
 
             print(
-                "ASL model type:",
-                type(self.model).__name__,
+                "Model type:",
+                type(self.model).__name__
             )
-
-            # ------------------------------------------------
-            # Print model classes if available
-            # ------------------------------------------------
 
             if hasattr(
                 self.model,
-                "classes_",
+                "classes_"
             ):
 
                 print(
-                    "ASL model classes:",
-                    self.model.classes_,
+                    "Classes:",
+                    self.model.classes_
                 )
 
+                print(
+                    "Number of classes:",
+                    len(self.model.classes_)
+                )
+
+            if hasattr(
+                self.model,
+                "n_features_in_"
+            ):
+
+                print(
+                    "Number of input features:",
+                    self.model.n_features_in_
+                )
+
+                # ------------------------------------------------
+                # IMPORTANT
+                #
+                # Your trained model must have 84 features.
+                # ------------------------------------------------
+
+                if self.model.n_features_in_ != 84:
+
+                    raise ValueError(
+                        "ASL Random Forest expects "
+                        f"{self.model.n_features_in_} features, "
+                        "but this application is configured "
+                        "for 84 features."
+                    )
+
             # ------------------------------------------------
-            # MediaPipe Hands
+            # MediaPipe
             #
-            # ASL uses one hand
+            # We use one hand.
+            #
+            # The 84 feature vector is:
+            #
+            # first hand = 42
+            # second hand = 42 zeros
+            #
             # ------------------------------------------------
 
-            self.hands = (
-                self.mp_hands.Hands(
-                    static_image_mode=False,
-                    max_num_hands=1,
-                    min_detection_confidence=0.5,
-                    min_tracking_confidence=0.5,
-                )
+            self.hands = self.mp_hands.Hands(
+
+                static_image_mode=False,
+
+                max_num_hands=1,
+
+                min_detection_confidence=0.5,
+
+                min_tracking_confidence=0.5,
             )
 
             self.reset_detection_state()
@@ -241,14 +296,16 @@ class ASLDetector:
         except Exception as exc:
 
             print(
-                "Error loading ASL model:",
-                exc,
+                "ERROR loading ASL model:",
+                repr(exc)
             )
+
+            self.model = None
 
             return False
 
     # ========================================================
-    # RESET AUTO DETECTION
+    # RESET
     # ========================================================
 
     def reset_detection_state(self):
@@ -261,8 +318,6 @@ class ASLDetector:
 
         self.cooldown_counter = 0
 
-        self.last_results = None
-
     # ========================================================
     # LANDMARK PROCESSING
     # ========================================================
@@ -273,11 +328,20 @@ class ASLDetector:
     ):
 
         """
-        Convert MediaPipe hand landmarks into
-        the 42-feature format used by the ASL
-        Random Forest model.
+        Convert MediaPipe landmarks into
+        the 84-feature representation required
+        by the trained Random Forest.
 
-        21 landmarks × x,y = 42 features.
+        21 landmarks × x,y = 42
+
+        First hand:
+            42 features
+
+        Second hand:
+            42 features
+
+        Total:
+            84 features
         """
 
         if hand_landmarks is None:
@@ -286,47 +350,46 @@ class ASLDetector:
                 "No ASL hand landmarks provided."
             )
 
-        data_aux = []
-
-        x_ = []
-        y_ = []
-
         # ----------------------------------------------------
-        # Extract coordinates
+        # First hand = 42
         # ----------------------------------------------------
+
+        first_hand = []
+
+        x_values = []
+        y_values = []
 
         for landmark in (
             hand_landmarks.landmark
         ):
 
-            x_.append(
+            x_values.append(
                 float(landmark.x)
             )
 
-            y_.append(
+            y_values.append(
                 float(landmark.y)
             )
 
         # ----------------------------------------------------
-        # Normalize using minimum x/y
+        # Normalize relative to minimum x/y
         #
-        # This matches the common MediaPipe
-        # landmark preprocessing used by the
-        # Random Forest ASL classifier.
+        # This matches the preprocessing used
+        # by the existing Random Forest code.
         # ----------------------------------------------------
 
-        min_x = min(x_)
-        min_y = min(y_)
+        min_x = min(x_values)
+        min_y = min(y_values)
 
         for landmark in (
             hand_landmarks.landmark
         ):
 
-            data_aux.append(
+            first_hand.append(
                 float(landmark.x) - min_x
             )
 
-            data_aux.append(
+            first_hand.append(
                 float(landmark.y) - min_y
             )
 
@@ -334,28 +397,57 @@ class ASLDetector:
         # Safety
         # ----------------------------------------------------
 
-        data_aux = data_aux[:42]
+        first_hand = first_hand[:42]
 
-        while len(data_aux) < 42:
+        while len(first_hand) < 42:
 
-            data_aux.append(0.0)
+            first_hand.append(0.0)
 
-        features = np.asarray(
-            data_aux,
-            dtype=np.float32,
+        # ----------------------------------------------------
+        # Second hand
+        #
+        # ASL uses one hand in this detector,
+        # therefore the remaining 42 features
+        # are zero.
+        # ----------------------------------------------------
+
+        second_hand = [
+            0.0
+        ] * 42
+
+        # ----------------------------------------------------
+        # Combine
+        # ----------------------------------------------------
+
+        features = (
+            first_hand
+            + second_hand
         )
 
-        if features.size != 42:
+        # ----------------------------------------------------
+        # Convert numpy
+        # ----------------------------------------------------
+
+        features = np.asarray(
+            features,
+            dtype=np.float32
+        )
+
+        # ----------------------------------------------------
+        # Validate
+        # ----------------------------------------------------
+
+        if features.size != 84:
 
             raise ValueError(
-                f"Expected 42 ASL features, "
+                "Expected 84 ASL features, "
                 f"got {features.size}"
             )
 
         return features
 
     # ========================================================
-    # PREDICT ASL
+    # PREDICT
     # ========================================================
 
     def predict(
@@ -367,10 +459,13 @@ class ASLDetector:
 
             if self.model is None:
 
-                return "?", 0.0
+                return (
+                    "?",
+                    0.0
+                )
 
             # ------------------------------------------------
-            # Create features
+            # Create 84 features
             # ------------------------------------------------
 
             features = (
@@ -379,12 +474,39 @@ class ASLDetector:
                 )
             )
 
+            # ------------------------------------------------
+            # Random Forest expects:
+            #
+            # (1, 84)
+            # ------------------------------------------------
+
             input_data = (
                 features.reshape(
                     1,
-                    -1,
+                    84
                 )
             )
+
+            # ------------------------------------------------
+            # Safety validation
+            # ------------------------------------------------
+
+            if hasattr(
+                self.model,
+                "n_features_in_"
+            ):
+
+                expected = (
+                    self.model.n_features_in_
+                )
+
+                if expected != 84:
+
+                    raise ValueError(
+                        "Model expects "
+                        f"{expected} features, "
+                        "but detector generated 84."
+                    )
 
             # ------------------------------------------------
             # Prediction
@@ -396,68 +518,26 @@ class ASLDetector:
                 )
             )
 
-            predicted_value = prediction[0]
+            predicted_value = (
+                prediction[0]
+            )
 
             # ------------------------------------------------
-            # Determine predicted class
-            #
-            # Some sklearn models return numpy
-            # integer labels.
+            # Convert class
             # ------------------------------------------------
 
-            try:
-
-                predicted_index = int(
-                    predicted_value
-                )
-
-            except Exception:
-
-                # If model returns string labels
-                detected_char = str(
-                    predicted_value
-                )
-
-                confidence = 0.0
-
-                if hasattr(
-                    self.model,
-                    "predict_proba",
-                ):
-
-                    probabilities = (
-                        self.model.predict_proba(
-                            input_data
-                        )
-                    )
-
-                    if (
-                        probabilities is not None
-                        and len(probabilities) > 0
-                    ):
-
-                        confidence = (
-                            float(
-                                np.max(
-                                    probabilities[0]
-                                )
-                            )
-                            * 100.0
-                        )
-
-                return (
-                    detected_char,
-                    confidence,
-                )
+            predicted_index = int(
+                predicted_value
+            )
 
             # ------------------------------------------------
-            # Convert class index to letter
+            # Label
             # ------------------------------------------------
 
             detected_char = (
                 self.asl_labels_dict.get(
                     predicted_index,
-                    "?",
+                    "?"
                 )
             )
 
@@ -469,7 +549,7 @@ class ASLDetector:
 
             if hasattr(
                 self.model,
-                "predict_proba",
+                "predict_proba"
             ):
 
                 try:
@@ -508,620 +588,16 @@ class ASLDetector:
 
                     print(
                         "ASL confidence error:",
-                        exc,
+                        repr(exc)
                     )
 
             # ------------------------------------------------
-            # If the Random Forest does not provide
-            # predict_proba(), use a fallback confidence.
+            # Fallback
             # ------------------------------------------------
 
             if confidence <= 0.0:
 
                 confidence = 85.0
-
-            # ------------------------------------------------
-            # Confidence threshold
-            # ------------------------------------------------
-
-            if (
-                confidence
-                >= self.confidence_threshold
-            ):
-
-                return (
-                    detected_char,
-                    confidence,
-                )
-
-            return (
-                "?",
-                confidence,
-            )
-
-        except Exception as exc:
-
-            print(
-                "ASL prediction error:",
-                exc,
-            )
-
-            return (
-                "?",
-                0.0,
-            )
-
-    # ========================================================
-    # AUTO DETECTION
-    # ========================================================
-
-    def should_auto_detect(
-        self,
-        detected_char,
-        confidence,
-    ):
-
-        """
-        Automatically accepts a character only when
-        the same prediction remains stable for the
-        required number of frames.
-        """
-
-        # ----------------------------------------------------
-        # Cooldown
-        # ----------------------------------------------------
-
-        if self.cooldown_counter > 0:
-
-            self.cooldown_counter -= 1
-
-            return (
-                False,
-                0.0,
-            )
-
-        # ----------------------------------------------------
-        # Invalid prediction
-        # ----------------------------------------------------
-
-        if (
-            detected_char == "?"
-            or confidence
-            < self.confidence_threshold
-        ):
-
-            self.last_prediction = None
-
-            self.prediction_counter = 0
-
-            return (
-                False,
-                0.0,
-            )
-
-        # ----------------------------------------------------
-        # Same prediction
-        # ----------------------------------------------------
-
-        if (
-            self.last_prediction
-            == detected_char
-        ):
-
-            self.prediction_counter += 1
-
-        else:
-
-            self.last_prediction = (
-                detected_char
-            )
-
-            self.prediction_counter = 1
-
-        # ----------------------------------------------------
-        # Progress
-        # ----------------------------------------------------
-
-        progress = min(
-            self.prediction_counter
-            / self.required_consistent_frames,
-            1.0,
-        )
-
-        # ----------------------------------------------------
-        # Character accepted
-        # ----------------------------------------------------
-
-        if (
-            self.prediction_counter
-            >= self.required_consistent_frames
-        ):
-
-            self.prediction_counter = 0
-
-            self.cooldown_counter = (
-                self.cooldown_frames
-            )
-
-            self.last_added_char = (
-                detected_char
-            )
-
-            return (
-                True,
-                1.0,
-            )
-
-        return (
-            False,
-            progress,
-        )
-
-    # ========================================================
-    # INSTRUCTIONS
-    # ========================================================
-
-    def get_instructions(self):
-
-        return [
-            "ASL Detection - Place one hand in green box",
-            "Hold the same sign for 1.5-2 seconds",
-            "The detected letter is added automatically",
-            "Press ENTER to add the word to the sentence",
-            "Press Q when the sentence is complete",
-        ]
-
-    # ========================================================
-    # CLEANUP
-    # ========================================================
-
-    def cleanup(self):
-
-        try:
-
-            if self.hands is not None:
-
-                self.hands.close()
-
-        except Exception:
-            pass
-
-        self.hands = None
-
-        self.last_results = None
-
-
-# ============================================================
-# ISL DETECTOR
-# ============================================================
-
-class ISLDetector:
-
-    def __init__(self):
-
-        self.model = None
-
-        self.mp_hands = (
-            mp.solutions.hands
-        )
-
-        self.mp_drawing = (
-            mp.solutions.drawing_utils
-        )
-
-        self.hands = None
-
-        # ----------------------------------------------------
-        # ISL LABEL ORDER
-        # ----------------------------------------------------
-
-        self.isl_labels_dict = {
-
-            0: "1",
-            1: "2",
-            2: "3",
-            3: "4",
-            4: "5",
-            5: "6",
-            6: "7",
-            7: "8",
-            8: "9",
-
-            9: "A",
-            10: "B",
-            11: "C",
-            12: "D",
-            13: "E",
-            14: "F",
-            15: "G",
-            16: "H",
-            17: "I",
-            18: "J",
-            19: "K",
-            20: "L",
-            21: "M",
-            22: "N",
-            23: "O",
-            24: "P",
-            25: "Q",
-            26: "R",
-            27: "S",
-            28: "T",
-            29: "U",
-            30: "V",
-            31: "W",
-            32: "X",
-            33: "Y",
-            34: "Z",
-
-            35: " ",
-        }
-
-        # ----------------------------------------------------
-        # MODEL PATH
-        # ----------------------------------------------------
-
-        base_dir = os.path.dirname(
-            os.path.abspath(__file__)
-        )
-
-        self.model_path = os.path.join(
-            base_dir,
-            "final_lstm_hand_model11.keras",
-        )
-
-        # ----------------------------------------------------
-        # AUTO DETECTION
-        # ----------------------------------------------------
-
-        self.last_prediction = None
-
-        self.prediction_counter = 0
-
-        # Around 2 seconds at ~15 FPS
-        self.required_consistent_frames = 30
-
-        self.last_added_char = None
-
-        self.cooldown_counter = 0
-
-        # Around 1 second at 15 FPS
-        self.cooldown_frames = 15
-
-        # Minimum confidence
-        self.confidence_threshold = 60.0
-
-        self.last_results = None
-
-    # ========================================================
-    # LOAD MODEL
-    # ========================================================
-
-    def load_model(self):
-
-        try:
-
-            if not os.path.exists(
-                self.model_path
-            ):
-
-                print(
-                    "ISL model file not found:"
-                )
-
-                print(
-                    self.model_path
-                )
-
-                return False
-
-            print(
-                "=========================================="
-            )
-
-            print(
-                "Loading ISL model:"
-            )
-
-            print(
-                self.model_path
-            )
-
-            self.model = load_model(
-                self.model_path,
-                compile=False,
-            )
-
-            print(
-                "ISL model loaded successfully."
-            )
-
-            print(
-                "Model input shape:",
-                self.model.input_shape,
-            )
-
-            print(
-                "Model output shape:",
-                self.model.output_shape,
-            )
-
-            # ------------------------------------------------
-            # MediaPipe Hands
-            # ------------------------------------------------
-
-            self.hands = (
-                self.mp_hands.Hands(
-                    static_image_mode=False,
-                    max_num_hands=2,
-                    min_detection_confidence=0.5,
-                    min_tracking_confidence=0.5,
-                )
-            )
-
-            self.reset_detection_state()
-
-            print(
-                "ISL MediaPipe initialized."
-            )
-
-            print(
-                "=========================================="
-            )
-
-            return True
-
-        except Exception as exc:
-
-            print(
-                "Error loading ISL model:",
-                exc,
-            )
-
-            return False
-
-    # ========================================================
-    # RESET AUTO DETECTION
-    # ========================================================
-
-    def reset_detection_state(self):
-
-        self.last_prediction = None
-
-        self.prediction_counter = 0
-
-        self.last_added_char = None
-
-        self.cooldown_counter = 0
-
-        self.last_results = None
-
-    # ========================================================
-    # LANDMARK PROCESSING
-    # ========================================================
-
-    def process_isl_landmarks(
-        self,
-        multi_hand_landmarks,
-    ):
-
-        """
-        ISL feature format:
-
-        First hand:
-            21 landmarks × x,y = 42
-
-        Second hand:
-            21 landmarks × x,y = 42
-
-        Total:
-            84 features
-
-        Final model input:
-            (1, 1, 84)
-        """
-
-        # ----------------------------------------------------
-        # First hand
-        # ----------------------------------------------------
-
-        first_hand = np.zeros(
-            21 * 2,
-            dtype=np.float32,
-        )
-
-        # ----------------------------------------------------
-        # Second hand
-        # ----------------------------------------------------
-
-        second_hand = np.zeros(
-            21 * 2,
-            dtype=np.float32,
-        )
-
-        # ----------------------------------------------------
-        # Process detected hands
-        # ----------------------------------------------------
-
-        if multi_hand_landmarks:
-
-            for (
-                hand_idx,
-                hand_landmarks
-            ) in enumerate(
-                multi_hand_landmarks
-            ):
-
-                values = []
-
-                for landmark in (
-                    hand_landmarks.landmark
-                ):
-
-                    values.append(
-                        float(landmark.x)
-                    )
-
-                    values.append(
-                        float(landmark.y)
-                    )
-
-                values = np.asarray(
-                    values[:42],
-                    dtype=np.float32,
-                )
-
-                if values.size < 42:
-
-                    values = np.pad(
-                        values,
-                        (
-                            0,
-                            42 - values.size,
-                        ),
-                    )
-
-                if hand_idx == 0:
-
-                    first_hand = values
-
-                elif hand_idx == 1:
-
-                    second_hand = values
-
-        # ----------------------------------------------------
-        # Combine
-        # ----------------------------------------------------
-
-        features = np.concatenate(
-            [
-                first_hand,
-                second_hand,
-            ]
-        )
-
-        # ----------------------------------------------------
-        # Safety
-        # ----------------------------------------------------
-
-        if features.size != 84:
-
-            raise ValueError(
-                f"Expected 84 features, "
-                f"got {features.size}"
-            )
-
-        # ----------------------------------------------------
-        # LSTM input
-        # ----------------------------------------------------
-
-        features = features.reshape(
-            1,
-            1,
-            84,
-        )
-
-        return features
-
-    # ========================================================
-    # PREDICT
-    # ========================================================
-
-    def predict(
-        self,
-        multi_hand_landmarks,
-    ):
-
-        try:
-
-            if self.model is None:
-
-                return (
-                    "?",
-                    0.0,
-                )
-
-            # ------------------------------------------------
-            # Process landmarks
-            # ------------------------------------------------
-
-            features = (
-                self.process_isl_landmarks(
-                    multi_hand_landmarks
-                )
-            )
-
-            # ------------------------------------------------
-            # Predict
-            # ------------------------------------------------
-
-            prediction = (
-                self.model.predict(
-                    features,
-                    verbose=0,
-                )
-            )
-
-            prediction = np.asarray(
-                prediction
-            )
-
-            if prediction.ndim == 2:
-
-                probabilities = (
-                    prediction[0]
-                )
-
-            else:
-
-                probabilities = (
-                    prediction.flatten()
-                )
-
-            # ------------------------------------------------
-            # Safety
-            # ------------------------------------------------
-
-            if probabilities.size == 0:
-
-                return (
-                    "?",
-                    0.0,
-                )
-
-            # ------------------------------------------------
-            # Get predicted class
-            # ------------------------------------------------
-
-            predicted_index = int(
-                np.argmax(
-                    probabilities
-                )
-            )
-
-            # ------------------------------------------------
-            # Confidence
-            # ------------------------------------------------
-
-            confidence = (
-                float(
-                    probabilities[
-                        predicted_index
-                    ]
-                )
-                * 100.0
-            )
-
-            # ------------------------------------------------
-            # Label
-            # ------------------------------------------------
-
-            detected_char = (
-                self.isl_labels_dict.get(
-                    predicted_index,
-                    "?",
-                )
-            )
 
             # ------------------------------------------------
             # Threshold
@@ -1134,24 +610,24 @@ class ISLDetector:
 
                 return (
                     detected_char,
-                    confidence,
+                    confidence
                 )
 
             return (
                 "?",
-                confidence,
+                confidence
             )
 
         except Exception as exc:
 
             print(
-                "ISL prediction error:",
-                exc,
+                "ASL prediction error:",
+                repr(exc)
             )
 
             return (
                 "?",
-                0.0,
+                0.0
             )
 
     # ========================================================
@@ -1164,11 +640,6 @@ class ISLDetector:
         confidence,
     ):
 
-        """
-        Automatically accepts a character only when
-        the same prediction remains stable.
-        """
-
         # ----------------------------------------------------
         # Cooldown
         # ----------------------------------------------------
@@ -1179,7 +650,7 @@ class ISLDetector:
 
             return (
                 False,
-                0.0,
+                0.0
             )
 
         # ----------------------------------------------------
@@ -1198,7 +669,7 @@ class ISLDetector:
 
             return (
                 False,
-                0.0,
+                0.0
             )
 
         # ----------------------------------------------------
@@ -1227,7 +698,7 @@ class ISLDetector:
         progress = min(
             self.prediction_counter
             / self.required_consistent_frames,
-            1.0,
+            1.0
         )
 
         # ----------------------------------------------------
@@ -1251,12 +722,12 @@ class ISLDetector:
 
             return (
                 True,
-                1.0,
+                1.0
             )
 
         return (
             False,
-            progress,
+            progress
         )
 
     # ========================================================
@@ -1266,9 +737,15 @@ class ISLDetector:
     def get_instructions(self):
 
         return [
-            "ISL Detection - Place hands in green box",
+
+            "ASL Detection - Place one hand in the green box",
+
             "Hold the same sign for 2-3 seconds",
+
+            "The character will be detected automatically",
+
             "Press ENTER to add the captured word to the sentence",
+
             "Press Q when the sentence is complete",
         ]
 
@@ -1285,6 +762,7 @@ class ISLDetector:
                 self.hands.close()
 
         except Exception:
+
             pass
 
         self.hands = None
@@ -1301,12 +779,16 @@ class UnifiedSignLanguageDetector:
     def __init__(self):
 
         # ----------------------------------------------------
-        # Create detectors
+        # ISL
         # ----------------------------------------------------
 
         self.isl_detector = (
             ISLDetector()
         )
+
+        # ----------------------------------------------------
+        # ASL
+        # ----------------------------------------------------
 
         self.asl_detector = (
             ASLDetector()
@@ -1330,8 +812,8 @@ class UnifiedSignLanguageDetector:
     ):
 
         self.language = (
-            language.upper()
-        )
+            language or "ISL"
+        ).upper()
 
         # ----------------------------------------------------
         # ISL
@@ -1369,6 +851,8 @@ class UnifiedSignLanguageDetector:
             f"{self.language} is not configured."
         )
 
+        self.current_detector = None
+
         return False
 
     # ========================================================
@@ -1378,7 +862,7 @@ class UnifiedSignLanguageDetector:
     def get_detector_info(self):
 
         # ----------------------------------------------------
-        # ISL information
+        # ISL
         # ----------------------------------------------------
 
         if (
@@ -1418,6 +902,7 @@ class UnifiedSignLanguageDetector:
 
                 "input_shape":
                     "(1, 1, 84)",
+
                 "auto_detection":
                     True,
 
@@ -1428,11 +913,10 @@ class UnifiedSignLanguageDetector:
                 "consistent_frames_required":
                     self.isl_detector
                     .required_consistent_frames,
-
             }
 
         # ----------------------------------------------------
-        # ASL information
+        # ASL
         # ----------------------------------------------------
 
         if (
@@ -1443,7 +927,7 @@ class UnifiedSignLanguageDetector:
             return {
 
                 "language":
-                    "ASL (American Sign Language)",
+                    "ASL",
 
                 "model_type":
                     "Random Forest",
@@ -1468,10 +952,10 @@ class UnifiedSignLanguageDetector:
                     ),
 
                 "input_features":
-                    42,
+                    84,
 
                 "input_shape":
-                    "(1, 42)",
+                    "(1, 84)",
 
                 "auto_detection":
                     True,
@@ -1483,7 +967,6 @@ class UnifiedSignLanguageDetector:
                 "consistent_frames_required":
                     self.asl_detector
                     .required_consistent_frames,
-
             }
 
         return {}
@@ -1496,10 +979,6 @@ class UnifiedSignLanguageDetector:
         self,
         frame,
     ):
-
-        # ----------------------------------------------------
-        # No detector
-        # ----------------------------------------------------
 
         if (
             self.current_detector
@@ -1514,7 +993,7 @@ class UnifiedSignLanguageDetector:
                     "detection_progress": 0.0,
                     "should_auto_detect": False,
                     "hand_count": 0,
-                },
+                }
             )
 
         # ----------------------------------------------------
@@ -1523,7 +1002,7 @@ class UnifiedSignLanguageDetector:
 
         frame_rgb = cv2.cvtColor(
             frame,
-            cv2.COLOR_BGR2RGB,
+            cv2.COLOR_BGR2RGB
         )
 
         # ----------------------------------------------------
@@ -1562,7 +1041,7 @@ class UnifiedSignLanguageDetector:
                     "detection_progress": 0.0,
                     "should_auto_detect": False,
                     "hand_count": 0,
-                },
+                }
             )
 
         # ====================================================
@@ -1572,7 +1051,7 @@ class UnifiedSignLanguageDetector:
         if self.language == "ASL":
 
             # ------------------------------------------------
-            # ASL uses first detected hand
+            # First hand
             # ------------------------------------------------
 
             hand_landmarks = (
@@ -1580,7 +1059,7 @@ class UnifiedSignLanguageDetector:
             )
 
             # ------------------------------------------------
-            # Predict
+            # Prediction
             # ------------------------------------------------
 
             detected_char, confidence = (
@@ -1597,7 +1076,7 @@ class UnifiedSignLanguageDetector:
                 self.asl_detector
                 .should_auto_detect(
                     detected_char,
-                    confidence,
+                    confidence
                 )
             )
 
@@ -1622,77 +1101,49 @@ class UnifiedSignLanguageDetector:
                     "cooldown_active":
                         self.asl_detector
                         .cooldown_counter > 0,
-                },
+                }
             )
 
         # ====================================================
         # ISL
         # ====================================================
 
-        if self.language == "ISL":
-
-            # ------------------------------------------------
-            # Predict
-            # ------------------------------------------------
-
-            detected_char, confidence = (
-                self.isl_detector.predict(
-                    results.multi_hand_landmarks
-                )
+        detected_char, confidence = (
+            self.isl_detector.predict(
+                results.multi_hand_landmarks
             )
+        )
 
-            # ------------------------------------------------
-            # Auto detection
-            # ------------------------------------------------
-
-            should_detect, progress = (
-                self.isl_detector
-                .should_auto_detect(
-                    detected_char,
-                    confidence,
-                )
-            )
-
-            return (
+        should_detect, progress = (
+            self.isl_detector
+            .should_auto_detect(
                 detected_char,
-                confidence,
-                {
-                    "hand_detected": True,
-
-                    "hand_count":
-                        len(
-                            results
-                            .multi_hand_landmarks
-                        ),
-
-                    "detection_progress":
-                        progress,
-
-                    "should_auto_detect":
-                        should_detect,
-
-                    "cooldown_active":
-                        self.isl_detector
-                        .cooldown_counter > 0,
-                },
+                confidence
             )
-
-        # ----------------------------------------------------
-        # Safety
-        # ----------------------------------------------------
+        )
 
         return (
-            "?",
-            0.0,
+            detected_char,
+            confidence,
             {
                 "hand_detected": True,
+
                 "hand_count":
                     len(
-                        results.multi_hand_landmarks
+                        results
+                        .multi_hand_landmarks
                     ),
-                "detection_progress": 0.0,
-                "should_auto_detect": False,
-            },
+
+                "detection_progress":
+                    progress,
+
+                "should_auto_detect":
+                    should_detect,
+
+                "cooldown_active":
+                    self.isl_detector
+                    .cooldown_counter > 0,
+            }
         )
 
     # ========================================================
@@ -1722,10 +1173,6 @@ class UnifiedSignLanguageDetector:
         ):
 
             return
-
-        # ----------------------------------------------------
-        # Draw every detected hand
-        # ----------------------------------------------------
 
         for hand_landmarks in (
             results.multi_hand_landmarks
@@ -1795,26 +1242,13 @@ class UnifiedSignLanguageDetector:
                 self.cap.release()
 
         except Exception:
+
             pass
 
         self.cap = None
 
-        # ----------------------------------------------------
-        # Cleanup both detectors
-        # ----------------------------------------------------
+        if self.current_detector:
 
-        try:
-
-            self.isl_detector.cleanup()
-
-        except Exception:
-            pass
-
-        try:
-
-            self.asl_detector.cleanup()
-
-        except Exception:
-            pass
+            self.current_detector.cleanup()
 
         cv2.destroyAllWindows()
