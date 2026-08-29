@@ -10,6 +10,7 @@ pydantic==2.10.6
 python-multipart==0.0.20
 
 h5py==3.12.1
+scikit-learn==1.2.2
 scikit-learn==1.5.2
 gTTS==2.5.4
 
